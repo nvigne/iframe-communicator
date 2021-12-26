@@ -1,7 +1,12 @@
+import { MessagingService } from "./connection.js";
+
 var button = document.getElementById("button");
 var iframe = document.getElementById("iframe") as HTMLIFrameElement;
-button.addEventListener("click", () => {
-    console.log("test");
-    iframe.contentWindow.postMessage("simpleMessage", "*");
+
+var c = new MessagingService("http://192.168.156.168:8080", iframe);
+c.addMessageHandler((data) => console.log(data));
+
+button?.addEventListener("click", () => {
+    c.postMessage("testtdsksdhdsk");
 })
 
