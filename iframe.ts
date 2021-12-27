@@ -6,7 +6,7 @@ var logger = {
     }
 }
 
-var c = new MessagingService("http://192.168.156.168:8080", undefined, "iframe", logger);
+var c = new MessagingService("http://127.0.0.1:8080", undefined, "iframe", logger);
 
 var button = document.getElementById("button");
 
