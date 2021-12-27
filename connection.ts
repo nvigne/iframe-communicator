@@ -1,5 +1,6 @@
 const WILDCARD_TARGET: string = "*";
 const UNKNOWN_DESTINATION: string = "UNKNOWN_DESTINATION"
+const MINIMUM_TIMEOUT: number = 4;
 
 export type MessageHandler = { (data: any): void };
 
@@ -64,15 +65,14 @@ export class MessagingService {
         
         window.addEventListener("message", this.listener.bind(this));
 
-        // Use to correctly initialize the messaging service.
         if (this.frame) {
             this.delayConnectToFrame();
         }
     }
 
     private delayConnectToFrame(): void {
-        var timeout = Math.floor(Math.random() * 10 + 4);
-        this.logger?.log("setInterval with delay: " + timeout + "ms")
+        var timeout = Math.floor(Math.random() * 100 + MINIMUM_TIMEOUT);
+        this.logger?.log("setInterval with delay: " + timeout + "ms, for: " + this.id)
         this.interval = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
     }
 
