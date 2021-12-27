@@ -1,6 +1,6 @@
 {
   "name": "iframe-messaging",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A simple messaging service to communicate between iframe.",
   "main": "connection.js",
   "scripts": {
