@@ -9,8 +9,8 @@ var logger = {
     }
 }
 
-var d = new MessagingService("http://192.168.156.168:8080", iframe, "d", logger);
-var c = new MessagingService("http://192.168.156.168:8080", iframe, "c", logger);
+var d = new MessagingService("http://192.168.156.168:8080", iframe, "secondWindow", logger);
+var c = new MessagingService("http://192.168.156.168:8080", iframe, "mainWindow", logger);
 
 d.addMessageHandler((data) => console.log("d:" + data))
 c.addMessageHandler((data) => console.log(data));

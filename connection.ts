@@ -11,10 +11,11 @@ type Channel = {
     destination: string;
     initialized: boolean;
     token: string;
+    state: State;
     window: WindowProxy | undefined | null;
 }
 
-type State = "SYN" | "ACK" | "SYN+ACK"
+type State = "SYN" | "ACK" | "SYN+ACK" | "FIN"
 
 interface ChannelInitializationMessage extends TokenMessage {
     source: string;
@@ -36,7 +37,7 @@ enum WindowType {
 }
 
 /**
- * Messaging service is used to perform communication between main window an a frame. It enables two-ways communication.
+ * Two-ways communication service between Window and Frame.
  */
 export class MessagingService {
     private interval: number | undefined;
@@ -58,7 +59,6 @@ export class MessagingService {
         if (target == WILDCARD_TARGET) {
             throw new Error("Don't use '*' as target.");
         }
-
         
         this.id = overrideId ?? this.GetRandomNumber();
         
@@ -66,8 +66,14 @@ export class MessagingService {
 
         // Use to correctly initialize the messaging service.
         if (this.frame) {
-            this.interval = setInterval(this.connectToFrame.bind(this), Math.random() * 1000)
+            this.delayConnectToFrame();
         }
+    }
+
+    private delayConnectToFrame(): void {
+        var timeout = Math.floor(Math.random() * 10 + 4);
+        this.logger?.log("setInterval with delay: " + timeout + "ms")
+        this.interval = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
     }
 
     /**
@@ -108,6 +114,11 @@ export class MessagingService {
 
         // Post to each channel a message.
         this.channels.forEach(channel => {
+            if (!channel.initialized) {
+                // skip non-initialized channel.
+                return;
+            }
+
             var message: ChannelMessage = {
                 token: channel.token,
                 data: data
@@ -123,8 +134,7 @@ export class MessagingService {
             return;
         }
 
-        this.logger?.log("send message to: " + channel.destination + " with token: " + channel.token);
-        this.logger?.log("send message using: " + this.GetType())
+        this.logger?.log("send message to: " + channel.destination + " with token: " + channel.token + ", from: " + this.id);
 
         switch (this.GetType()) {
             case WindowType.Window:
@@ -137,22 +147,30 @@ export class MessagingService {
     }
 
     private postInitializationMessage(data: ChannelInitializationMessage, channel: Channel) {
-        this.logger?.log("send handshake with state: " + data.state);
+        this.logger?.log("send handshake with state: " + data.state + ", frame: " + data.frame);
 
         this.postMessageInternal<ChannelInitializationMessage>(data, channel);
     }
 
-    private connectToFrame(): void {
-        if (!this.frame?.contentWindow) {
-            throw new Error("Frame or contentWindow is null.");
+    private connectToFrame(frame: HTMLIFrameElement): void {
+        // We expect to have only one channel open here.
+        for (let [key, value] of this.channels) {
+            // If we changed state, it means initialization is ongoing.
+            if (value.state != "SYN") {
+                return;
+            }
         }
+
+        // Otherwise let's clear the channels and start from fresh.
+        this.channels.clear();
 
         var token = this.GetRandomNumber();
         var channel: Channel = {
             token: token,
             destination: UNKNOWN_DESTINATION,
             initialized: false,
-            window: this.frame.contentWindow,
+            window: frame.contentWindow,
+            state: "SYN",
         };
 
         this.channels.set(token, channel)
@@ -163,14 +181,14 @@ export class MessagingService {
             state: "SYN",
             frame: 1,
         }, channel);
+
+        this.delayConnectToFrame();
     }
 
     private listener(event: MessageEvent<any>): void {
         if (event.origin != this.target) {
             throw new Error("Origin does not match expected target");
         }
-
-        this.logger?.log("receive message on " + this.id + ", type: " + this.GetType());
 
         if (event.data) {
             var initializationMessage = event.data as ChannelInitializationMessage;
@@ -183,43 +201,58 @@ export class MessagingService {
         }
     }
 
+    /**
+     * Initialize channel between the two window. It follows a three-way handshake.
+     * 
+     * | Window |                                 | Frame |
+     * |--------------------------------------------------|
+     * |        | ---- SYN (frame + token) -----> |       |
+     * |        | <--- SYN+ACK (frame + token) -- |       |
+     * |        | ----- ACK (frame + token) ----> |       |
+     * 
+     * @param event The event receive by the event listener.
+     */
     private initialize(event: MessageEvent<any>): void {
         var message = event.data as ChannelInitializationMessage;
 
         var updatedOrNewChannel: Channel;
-        var state: State;
+        var nextState: State;
 
-        this.logger?.log("receive initialization with state: " + message.state + ", frame: " + message.frame)
+        this.logger?.log("receive initialization with state: " + message.state + ", frame: " + message.frame + ", token: " + message.token + ", source: " + message.source)
 
         if (message.state == "SYN+ACK") {
-            if (this.channels.has(message.token)) {
-                var channel = this.channels.get(message.token);
-                if (!channel || channel?.initialized) {
-                    return;
-                }
-    
-                state = "ACK";
-    
-                updatedOrNewChannel = {
-                    token: message.token,
-                    destination: message.source,
-                    initialized: true,
-                    window: channel?.window,
-                }
+            if (!this.channels.has(message.token)) {
+                return;
+            }
 
-                this.channels.set(message.token, updatedOrNewChannel);
+            var channel = this.channels.get(message.token);
+            if (!channel)
+            {
+                throw new Error("Unexitisting channel for the given token: " + message.token);
+            }
 
-                this.postInitializationMessage({
-                    token: message.token,
-                    source: this.id,
-                    state: state,
-                    frame: message.frame + 1,
-                }, updatedOrNewChannel);
+            updatedOrNewChannel = {
+                token: message.token,
+                destination: message.source,
+                initialized: true,
+                window: channel.window,
+                state: "ACK"
+            }
 
-                
-                if (this.interval) {
-                    clearInterval(this.interval);
-                }
+            nextState = "ACK";
+
+            this.channels.set(message.token, updatedOrNewChannel);
+
+            this.postInitializationMessage({
+                token: message.token,
+                source: this.id,
+                state: nextState,
+                frame: message.frame + 1,
+            }, updatedOrNewChannel);
+
+            
+            if (this.interval) {
+                clearInterval(this.interval);
             }
         } else if (message.state == "SYN") {
             updatedOrNewChannel = {
@@ -227,36 +260,39 @@ export class MessagingService {
                 destination: UNKNOWN_DESTINATION,
                 initialized: false,
                 window: event.source as WindowProxy,
+                state: "SYN+ACK"
             };
 
-            state = "SYN+ACK"
+            nextState = "SYN+ACK"
 
             this.channels.set(message.token, updatedOrNewChannel);
 
             this.postInitializationMessage({
                 token: message.token,
                 source: this.id,
-                state: state,
+                state: nextState,
                 frame: message.frame + 1,
             }, updatedOrNewChannel);
         } else if (message.state == "ACK") {
-            if (this.channels.has(message.token)) {
-                var channel = this.channels.get(message.token);
-                if (!channel || channel?.initialized) {
-                    return;
-                }
-    
-                state = "ACK";
-    
-                updatedOrNewChannel = {
-                    token: message.token,
-                    destination: message.source,
-                    initialized: true,
-                    window: channel?.window,
-                }
-
-                this.channels.set(message.token, updatedOrNewChannel);
+            if (!this.channels.has(message.token)) {
+                return;
             }
+
+            var channel = this.channels.get(message.token);
+            if (!channel)
+            {
+                throw new Error("Unexitisting channel for the given token: " + message.token);
+            }
+
+            updatedOrNewChannel = {
+                token: message.token,
+                destination: message.source,
+                initialized: true,
+                window: channel.window,
+                state: "FIN",
+            }
+
+            this.channels.set(message.token, updatedOrNewChannel);
 
             return;
         }
@@ -267,7 +303,6 @@ export class MessagingService {
         
         // If we don't have a channel for this token, we don't deal with it.
         if (!this.channels.has(channelMessage.token)) {
-            this.logger?.log("receive a message with no valid token. drop.")
             return
         }
 
