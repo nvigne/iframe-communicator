@@ -4,7 +4,7 @@
         "module": "es2020",
         "sourceMap": false,
         "strict": true,
-        "outDir": "out/"
+        "declaration": true
     },
-    "include": ["iframe.ts", "index.ts", "connection.ts"]
+    "include": ["connection.ts"]
 }
