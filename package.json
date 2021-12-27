@@ -2,7 +2,7 @@
   "name": "iframe-messaging",
   "version": "0.1.2",
   "description": "A simple messaging service to communicate between iframe.",
-  "main": "index.js",
+  "main": "connection.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
