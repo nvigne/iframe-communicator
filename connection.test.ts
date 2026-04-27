@@ -6,7 +6,7 @@ type MessageListener = (event: MessageEvent<any>) => void;
 class TestWindow {
     private listeners: MessageListener[] = [];
 
-    remote: TestWindow | null = null;
+    sourceWindow: TestWindow | null = null;
 
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
         if (type !== "message") {
@@ -19,10 +19,11 @@ class TestWindow {
     }
 
     postMessage(data: any, targetOrigin: string): void {
+        // MessagingService calls postMessage on the target window proxy, so deliver to this window's listeners.
         this.listeners.forEach(listener => listener({
             data,
             origin: targetOrigin,
-            source: this.remote,
+            source: this.sourceWindow,
         } as MessageEvent<any>));
     }
 }
@@ -35,8 +36,8 @@ function createConnectedServices(): { parent: MessagingService, frame: Messaging
     const parentWindow = new TestWindow();
     const frameWindow = new TestWindow();
 
-    parentWindow.remote = frameWindow;
-    frameWindow.remote = parentWindow;
+    parentWindow.sourceWindow = frameWindow;
+    frameWindow.sourceWindow = parentWindow;
 
     useWindow(parentWindow);
     const parent = new MessagingService("https://example.test", { contentWindow: frameWindow } as HTMLIFrameElement, "parent");
