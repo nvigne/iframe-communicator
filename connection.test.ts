@@ -9,11 +9,11 @@ class TestWindow {
     remote: TestWindow | null = null;
 
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
-        if (type != "message") {
+        if (type !== "message") {
             return;
         }
 
-        if (typeof listener == "function") {
+        if (typeof listener === "function") {
             this.listeners.push(listener as MessageListener);
         }
     }

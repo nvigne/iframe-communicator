@@ -11,7 +11,7 @@
 ## Validation
 
 - Use `tsc --noEmit` to type-check the current TypeScript source.
-- `npm test` is not a real test suite in the current repo; it exits with `Error: no test specified`.
+- Use `npm test` to run the Vitest test suite.
 - There is no configured lint script or build script in `package.json`.
 
 ## Coding guidance
