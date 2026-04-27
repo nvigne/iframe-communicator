@@ -4,7 +4,8 @@
         "module": "es2020",
         "sourceMap": false,
         "strict": true,
-        "declaration": true
+        "declaration": true,
+        "types": []
     },
     "include": ["connection.ts"]
 }
