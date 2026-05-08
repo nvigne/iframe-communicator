@@ -2,7 +2,7 @@ const WILDCARD_TARGET: string = "*";
 const UNKNOWN_DESTINATION: string = "UNKNOWN_DESTINATION"
 const MINIMUM_TIMEOUT: number = 4;
 
-export type MessageHandler<T = unknown> = { (data: T): void };
+export type MessageHandler = { (data: unknown): void };
 
 export interface Logger { 
     log(data: string): void;
@@ -42,7 +42,7 @@ enum WindowType {
  */
 export class MessagingService {
     private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-    private handlers: Map<number, MessageHandler<unknown>> = new Map<number, MessageHandler<unknown>>();
+    private handlers: Map<number, MessageHandler> = new Map<number, MessageHandler>();
 
     private channels: Map<string, Channel> = new Map<string, Channel>();
 
@@ -88,9 +88,9 @@ export class MessagingService {
      * Append a message handler. The callback will be called when receiving a message.
      * @param handler The message handler that will receive the message.
      */
-    addMessageHandler<T = unknown>(handler: MessageHandler<T>): number {
+    addMessageHandler(handler: MessageHandler): number {
         var handlerId = parseInt(this.GetRandomNumber());
-        this.handlers.set(handlerId, handler as MessageHandler<unknown>);
+        this.handlers.set(handlerId, handler);
         return handlerId;
     }
 
@@ -190,6 +190,7 @@ export class MessagingService {
             frame: 1,
         }, channel);
 
+        // Retry only while the channel is still waiting for a SYN+ACK response.
         if (this.channels.get(token)?.state === "SYN") {
             this.delayConnectToFrame();
         }
