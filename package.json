@@ -4,9 +4,17 @@
   "description": "A simple messaging service to communicate between iframe.",
   "main": "connection.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "author": "nvigne",
   "license": "ISC",
-  "files": ["connection.js", "connection.d.ts", "README.md"]
+  "files": [
+    "connection.js",
+    "connection.d.ts",
+    "README.md"
+  ],
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.13"
+  }
 }
