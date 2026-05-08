@@ -5,7 +5,7 @@ type MessageListener = (event: MessageEvent<any>) => void;
 
 class TestWindow {
     private listeners: MessageListener[] = [];
-    postedMessages: unknown[] = [];
+    capturedMessages: unknown[] = [];
 
     sourceWindow: TestWindow | null = null;
 
@@ -21,7 +21,7 @@ class TestWindow {
 
     postMessage(data: any, targetOrigin: string): void {
         // MessagingService calls postMessage on the target window proxy, so deliver to this window's listeners.
-        this.postedMessages.push(data);
+        this.capturedMessages.push(data);
         this.listeners.forEach(listener => listener({
             data,
             origin: targetOrigin,
@@ -88,17 +88,17 @@ describe("MessagingService", () => {
         const parentHandler = vi.fn();
         const frameHandler = vi.fn();
 
-        expect(frameWindow.postedMessages).toContainEqual(expect.objectContaining({
+        expect(frameWindow.capturedMessages).toContainEqual(expect.objectContaining({
             source: "parent",
             state: "SYN",
             frame: 1,
         }));
-        expect(parentWindow.postedMessages).toContainEqual(expect.objectContaining({
+        expect(parentWindow.capturedMessages).toContainEqual(expect.objectContaining({
             source: "frame",
             state: "SYN+ACK",
             frame: 2,
         }));
-        expect(frameWindow.postedMessages).toContainEqual(expect.objectContaining({
+        expect(frameWindow.capturedMessages).toContainEqual(expect.objectContaining({
             source: "parent",
             state: "ACK",
             frame: 3,

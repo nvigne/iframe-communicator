@@ -41,7 +41,7 @@ enum WindowType {
  * Two-ways communication service between Window and Frame.
  */
 export class MessagingService {
-    private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    private handshakeTimer: ReturnType<typeof setTimeout> | undefined;
     private handlers: Map<number, MessageHandler> = new Map<number, MessageHandler>();
 
     private channels: Map<string, Channel> = new Map<string, Channel>();
@@ -66,21 +66,21 @@ export class MessagingService {
         window.addEventListener("message", this.listener.bind(this));
 
         if (this.frame) {
-            this.delayConnectToFrame();
+            this.scheduleHandshakeAttempt();
         }
     }
 
-    private delayConnectToFrame(): void {
+    private scheduleHandshakeAttempt(): void {
         var timeout = Math.floor(Math.random() * 100 + MINIMUM_TIMEOUT);
         this.logger?.log("setInterval with delay: " + timeout + "ms, for: " + this.id)
-        this.clearConnectionTimer();
-        this.reconnectTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+        this.clearHandshakeTimer();
+        this.handshakeTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
     }
 
-    private clearConnectionTimer(): void {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = undefined;
+    private clearHandshakeTimer(): void {
+        if (this.handshakeTimer) {
+            clearTimeout(this.handshakeTimer);
+            this.handshakeTimer = undefined;
         }
     }
 
@@ -190,9 +190,9 @@ export class MessagingService {
             frame: 1,
         }, channel);
 
-        // Retry only while the channel is still waiting for a SYN+ACK response.
+        // postMessage can synchronously deliver a SYN+ACK; retry only if the channel did not advance.
         if (this.channels.get(token)?.state === "SYN") {
-            this.delayConnectToFrame();
+            this.scheduleHandshakeAttempt();
         }
     }
 
@@ -262,7 +262,7 @@ export class MessagingService {
             }, updatedOrNewChannel);
 
             
-            this.clearConnectionTimer();
+            this.clearHandshakeTimer();
         } else if (message.state === "SYN") {
             updatedOrNewChannel = {
                 token: message.token,
