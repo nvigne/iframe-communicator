@@ -5,7 +5,7 @@ type MessageListener = (event: MessageEvent<any>) => void;
 
 class TestWindow {
     private listeners: MessageListener[] = [];
-    postedMessages: any[] = [];
+    postedMessages: unknown[] = [];
 
     sourceWindow: TestWindow | null = null;
 

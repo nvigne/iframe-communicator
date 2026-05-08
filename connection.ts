@@ -41,7 +41,7 @@ enum WindowType {
  * Two-ways communication service between Window and Frame.
  */
 export class MessagingService {
-    private connectionTimer: ReturnType<typeof setTimeout> | undefined;
+    private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     private handlers: Map<number, MessageHandler<unknown>> = new Map<number, MessageHandler<unknown>>();
 
     private channels: Map<string, Channel> = new Map<string, Channel>();
@@ -57,7 +57,7 @@ export class MessagingService {
      * @param frame A reference to the frame we want to communicate with. if no frame is passed, we assume we initialize the frame communication object.
      */
     constructor(private target: string, private frame?: HTMLIFrameElement, overrideId?: string, private logger?: Logger) {
-        if (target == WILDCARD_TARGET) {
+        if (target === WILDCARD_TARGET) {
             throw new Error("Don't use '*' as target.");
         }
         
@@ -74,13 +74,13 @@ export class MessagingService {
         var timeout = Math.floor(Math.random() * 100 + MINIMUM_TIMEOUT);
         this.logger?.log("setInterval with delay: " + timeout + "ms, for: " + this.id)
         this.clearConnectionTimer();
-        this.connectionTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+        this.reconnectTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
     }
 
     private clearConnectionTimer(): void {
-        if (this.connectionTimer) {
-            clearTimeout(this.connectionTimer);
-            this.connectionTimer = undefined;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = undefined;
         }
     }
 
@@ -164,7 +164,7 @@ export class MessagingService {
         // We expect to have only one channel open here.
         for (let [key, value] of this.channels) {
             // If we changed state, it means initialization is ongoing.
-            if (value.state != "SYN") {
+            if (value.state !== "SYN") {
                 return;
             }
         }
@@ -190,13 +190,13 @@ export class MessagingService {
             frame: 1,
         }, channel);
 
-        if (this.channels.get(token)?.state == "SYN") {
+        if (this.channels.get(token)?.state === "SYN") {
             this.delayConnectToFrame();
         }
     }
 
     private listener(event: MessageEvent<unknown>): void {
-        if (event.origin != this.target) {
+        if (event.origin !== this.target) {
             throw new Error("Origin does not match expected target");
         }
 
@@ -230,7 +230,7 @@ export class MessagingService {
 
         this.logger?.log("receive initialization with state: " + message.state + ", frame: " + message.frame + ", token: " + message.token + ", source: " + message.source)
 
-        if (message.state == "SYN+ACK") {
+        if (message.state === "SYN+ACK") {
             if (!this.channels.has(message.token)) {
                 return;
             }
@@ -262,7 +262,7 @@ export class MessagingService {
 
             
             this.clearConnectionTimer();
-        } else if (message.state == "SYN") {
+        } else if (message.state === "SYN") {
             updatedOrNewChannel = {
                 token: message.token,
                 destination: UNKNOWN_DESTINATION,
@@ -281,7 +281,7 @@ export class MessagingService {
                 state: nextState,
                 frame: message.frame + 1,
             }, updatedOrNewChannel);
-        } else if (message.state == "ACK") {
+        } else if (message.state === "ACK") {
             if (!this.channels.has(message.token)) {
                 return;
             }
