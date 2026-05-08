@@ -2,7 +2,7 @@ const WILDCARD_TARGET: string = "*";
 const UNKNOWN_DESTINATION: string = "UNKNOWN_DESTINATION"
 const MINIMUM_TIMEOUT: number = 4;
 
-export type MessageHandler = { (data: any): void };
+export type MessageHandler<T = unknown> = { (data: T): void };
 
 export interface Logger { 
     log(data: string): void;
@@ -25,7 +25,7 @@ interface ChannelInitializationMessage extends TokenMessage {
 }
 
 interface ChannelMessage extends TokenMessage {
-    data: any,
+    data: unknown,
 }
 
 interface TokenMessage {
@@ -41,8 +41,8 @@ enum WindowType {
  * Two-ways communication service between Window and Frame.
  */
 export class MessagingService {
-    private interval: number | undefined;
-    private handlers: Map<number, MessageHandler> = new Map<number, MessageHandler>();
+    private connectionTimer: ReturnType<typeof setTimeout> | undefined;
+    private handlers: Map<number, MessageHandler<unknown>> = new Map<number, MessageHandler<unknown>>();
 
     private channels: Map<string, Channel> = new Map<string, Channel>();
 
@@ -73,16 +73,24 @@ export class MessagingService {
     private delayConnectToFrame(): void {
         var timeout = Math.floor(Math.random() * 100 + MINIMUM_TIMEOUT);
         this.logger?.log("setInterval with delay: " + timeout + "ms, for: " + this.id)
-        this.interval = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+        this.clearConnectionTimer();
+        this.connectionTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+    }
+
+    private clearConnectionTimer(): void {
+        if (this.connectionTimer) {
+            clearTimeout(this.connectionTimer);
+            this.connectionTimer = undefined;
+        }
     }
 
     /**
      * Append a message handler. The callback will be called when receiving a message.
      * @param handler The message handler that will receive the message.
      */
-    addMessageHandler(handler: MessageHandler): number {
+    addMessageHandler<T = unknown>(handler: MessageHandler<T>): number {
         var handlerId = parseInt(this.GetRandomNumber());
-        this.handlers.set(handlerId, handler);
+        this.handlers.set(handlerId, handler as MessageHandler<unknown>);
         return handlerId;
     }
 
@@ -182,10 +190,12 @@ export class MessagingService {
             frame: 1,
         }, channel);
 
-        this.delayConnectToFrame();
+        if (this.channels.get(token)?.state == "SYN") {
+            this.delayConnectToFrame();
+        }
     }
 
-    private listener(event: MessageEvent<any>): void {
+    private listener(event: MessageEvent<unknown>): void {
         if (event.origin != this.target) {
             throw new Error("Origin does not match expected target");
         }
@@ -212,7 +222,7 @@ export class MessagingService {
      * 
      * @param event The event receive by the event listener.
      */
-    private initialize(event: MessageEvent<any>): void {
+    private initialize(event: MessageEvent<unknown>): void {
         var message = event.data as ChannelInitializationMessage;
 
         var updatedOrNewChannel: Channel;
@@ -251,9 +261,7 @@ export class MessagingService {
             }, updatedOrNewChannel);
 
             
-            if (this.interval) {
-                clearInterval(this.interval);
-            }
+            this.clearConnectionTimer();
         } else if (message.state == "SYN") {
             updatedOrNewChannel = {
                 token: message.token,
@@ -298,7 +306,7 @@ export class MessagingService {
         }
     }
 
-    private dispatchEvent(message: any): void {
+    private dispatchEvent(message: unknown): void {
         var channelMessage = message as ChannelMessage
         
         // If we don't have a channel for this token, we don't deal with it.
