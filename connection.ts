@@ -2,7 +2,7 @@ const WILDCARD_TARGET: string = "*";
 const UNKNOWN_DESTINATION: string = "UNKNOWN_DESTINATION"
 const MINIMUM_TIMEOUT: number = 4;
 
-export type MessageHandler = { (data: any): void };
+export type MessageHandler = { (data: unknown): void };
 
 export interface Logger { 
     log(data: string): void;
@@ -25,7 +25,7 @@ interface ChannelInitializationMessage extends TokenMessage {
 }
 
 interface ChannelMessage extends TokenMessage {
-    data: any,
+    data: unknown,
 }
 
 interface TokenMessage {
@@ -41,7 +41,7 @@ enum WindowType {
  * Two-ways communication service between Window and Frame.
  */
 export class MessagingService {
-    private interval: number | undefined;
+    private handshakeTimer: ReturnType<typeof setTimeout> | undefined;
     private handlers: Map<number, MessageHandler> = new Map<number, MessageHandler>();
 
     private channels: Map<string, Channel> = new Map<string, Channel>();
@@ -57,7 +57,7 @@ export class MessagingService {
      * @param frame A reference to the frame we want to communicate with. if no frame is passed, we assume we initialize the frame communication object.
      */
     constructor(private target: string, private frame?: HTMLIFrameElement, overrideId?: string, private logger?: Logger) {
-        if (target == WILDCARD_TARGET) {
+        if (target === WILDCARD_TARGET) {
             throw new Error("Don't use '*' as target.");
         }
         
@@ -66,14 +66,22 @@ export class MessagingService {
         window.addEventListener("message", this.listener.bind(this));
 
         if (this.frame) {
-            this.delayConnectToFrame();
+            this.scheduleHandshakeAttempt();
         }
     }
 
-    private delayConnectToFrame(): void {
+    private scheduleHandshakeAttempt(): void {
         var timeout = Math.floor(Math.random() * 100 + MINIMUM_TIMEOUT);
         this.logger?.log("setInterval with delay: " + timeout + "ms, for: " + this.id)
-        this.interval = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+        this.clearHandshakeTimer();
+        this.handshakeTimer = setTimeout(this.connectToFrame.bind(this), timeout, this.frame)
+    }
+
+    private clearHandshakeTimer(): void {
+        if (this.handshakeTimer) {
+            clearTimeout(this.handshakeTimer);
+            this.handshakeTimer = undefined;
+        }
     }
 
     /**
@@ -156,7 +164,7 @@ export class MessagingService {
         // We expect to have only one channel open here.
         for (let [key, value] of this.channels) {
             // If we changed state, it means initialization is ongoing.
-            if (value.state != "SYN") {
+            if (value.state !== "SYN") {
                 return;
             }
         }
@@ -182,11 +190,14 @@ export class MessagingService {
             frame: 1,
         }, channel);
 
-        this.delayConnectToFrame();
+        // postMessage can synchronously deliver a SYN+ACK; retry only if the channel did not advance.
+        if (this.channels.get(token)?.state === "SYN") {
+            this.scheduleHandshakeAttempt();
+        }
     }
 
-    private listener(event: MessageEvent<any>): void {
-        if (event.origin != this.target) {
+    private listener(event: MessageEvent<unknown>): void {
+        if (event.origin !== this.target) {
             throw new Error("Origin does not match expected target");
         }
 
@@ -212,7 +223,7 @@ export class MessagingService {
      * 
      * @param event The event receive by the event listener.
      */
-    private initialize(event: MessageEvent<any>): void {
+    private initialize(event: MessageEvent<unknown>): void {
         var message = event.data as ChannelInitializationMessage;
 
         var updatedOrNewChannel: Channel;
@@ -220,7 +231,7 @@ export class MessagingService {
 
         this.logger?.log("receive initialization with state: " + message.state + ", frame: " + message.frame + ", token: " + message.token + ", source: " + message.source)
 
-        if (message.state == "SYN+ACK") {
+        if (message.state === "SYN+ACK") {
             if (!this.channels.has(message.token)) {
                 return;
             }
@@ -251,10 +262,8 @@ export class MessagingService {
             }, updatedOrNewChannel);
 
             
-            if (this.interval) {
-                clearInterval(this.interval);
-            }
-        } else if (message.state == "SYN") {
+            this.clearHandshakeTimer();
+        } else if (message.state === "SYN") {
             updatedOrNewChannel = {
                 token: message.token,
                 destination: UNKNOWN_DESTINATION,
@@ -273,7 +282,7 @@ export class MessagingService {
                 state: nextState,
                 frame: message.frame + 1,
             }, updatedOrNewChannel);
-        } else if (message.state == "ACK") {
+        } else if (message.state === "ACK") {
             if (!this.channels.has(message.token)) {
                 return;
             }
@@ -298,7 +307,7 @@ export class MessagingService {
         }
     }
 
-    private dispatchEvent(message: any): void {
+    private dispatchEvent(message: unknown): void {
         var channelMessage = message as ChannelMessage
         
         // If we don't have a channel for this token, we don't deal with it.
