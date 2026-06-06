@@ -1,10 +1,18 @@
 {
-  "name": "iframe-messaging",
+  "name": "@nvigne/iframe-messaging",
   "version": "0.1.4",
   "description": "A simple messaging service to communicate between iframe.",
   "main": "connection.js",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nvigne/iframe-communicator.git"
   },
   "author": "nvigne",
   "license": "ISC",
